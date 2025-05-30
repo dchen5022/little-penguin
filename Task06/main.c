@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Kamal Heib.  All rights reserved.
+ * Copyright (c) 2025 Dennis Chen.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -30,74 +30,76 @@
  * SOFTWARE.
  */
 
+#include <asm/uaccess.h>
 #include <linux/fs.h>
-#include <linux/module.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
 
-MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
-MODULE_DESCRIPTION("Little Penguin Task06");
+MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
+MODULE_DESCRIPTION("little penguin Task6");
 MODULE_VERSION("0.1");
-MODULE_LICENSE("GPL v3");
+MODULE_LICENSE("GPL");
 
-static ssize_t t6_read(struct file *file,
-		       char __user *ubuf,
-		       size_t count,
-		       loff_t *ppos)
-{
-	char buf[10];
-	ssize_t len;
+uint8_t *id = "682c83e55b77";
+#define ID_LEN 12
+#define BUF_LEN 50
 
-	len = snprintf(buf, sizeof(buf), "%d\n", MISC_DYNAMIC_MINOR);
-	return simple_read_from_buffer(ubuf, count, ppos, buf, len);
+static ssize_t t6_misc_write(struct file *filp, const char __user *buff,
+                             size_t count, loff_t *offp) {
+  pr_info("t6_misc_dev: write called");
+  uint8_t databuf[BUF_LEN];
+
+  if (copy_from_user(databuf, buff, BUF_LEN)) {
+    return -EFAULT;
+  }
+
+  /* end string to prevent looking at uninit memory */
+  databuf[count] = '\0';
+
+  pr_info("t6_misc_dev: count : %d\n", count);
+  pr_info("t6_misc_dev: input len: %d\n", strlen(databuf));
+  pr_info("t6_misc_dev: input : %s\n", databuf);
+  if (strncmp(databuf, id, ID_LEN) != 0 || strlen(databuf) != ID_LEN) {
+    return -EINVAL;
+  }
+  return count;
 }
 
-static ssize_t t6_write(struct file *file,
-			const char __user *ubuf,
-			size_t count,
-			loff_t *ppos)
-{
-	int num;
-	int err;
-	char buf[80];
+static ssize_t t6_misc_read(struct file *filp, char __user *buff, size_t count,
+                            loff_t *offp) {
+  pr_info("t6_misc_dev: read called");
+  int error;
+  error = copy_to_user(buff, id, ID_LEN + 1);
+  if (error)
+    return -EFAULT;
 
-	err = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, ubuf, count);
-	if (err < 0)
-		return err;
-
-	sscanf(buf, "%x\n", &num);
-
-	return num == MISC_DYNAMIC_MINOR ? count : -EINVAL;
-
+  return count;
 }
 
-static const struct file_operations t6_chardev_ops = {
-	.read	= t6_read,
-	.write	= t6_write,
+static const struct file_operations t6_misc_fops = {
+    .owner = THIS_MODULE, .write = t6_misc_write, .read = t6_misc_read};
+
+struct miscdevice t6_misc = {
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = "eudyptula",
+    .fops = &t6_misc_fops,
 };
 
-static struct miscdevice t6_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "eudyptula",
-	.fops = &t6_chardev_ops,
-};
+static int __init t6_init(void) {
+  int error;
+  error = misc_register(&t6_misc);
+  if (error) {
+    pr_err("t6_misc_dev: misc_register failed with code: %d\n", error);
+    return error;
+  }
 
-static int __init t6_init(void)
-{
-	int err = 0;
-
-	pr_info("Task06: Hello World!");
-	err = misc_register(&t6_dev);
-	if (err)
-		pr_err("Task06: Failed to register t6 misc device err(%d)\n",
-		       err);
-
-	return err;
+  printk(KERN_DEBUG "t6_misc_dev: t6_misc_dev registered!\n");
+  return 0;
 }
 
-static void __exit t6_exit(void)
-{
-	pr_info("Task06: Good bye!");
-	misc_deregister(&t6_dev);
+static void __exit t6_exit(void) {
+  misc_deregister(&t6_misc);
+  printk(KERN_DEBUG "t6_misc_dev: t6_misc_dev deregistered!\n");
 }
 
 module_init(t6_init);

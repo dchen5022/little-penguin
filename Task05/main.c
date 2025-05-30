@@ -29,36 +29,66 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 #include <linux/module.h>
-#include <linux/usb.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/usb/input.h>
 #include <linux/hid.h>
 
-MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
-MODULE_DESCRIPTION("little penguin Task1");
-MODULE_VERSION("0.1");
-MODULE_LICENSE("GPL v2");
+MODULE_AUTHOR("author");
+MODULE_DESCRIPTION("helloworld module\n");
+MODULE_LICENSE("GPL");
 
-static struct usb_device_id t1_id_table[] = {
-	{ USB_INTERFACE_INFO(USB_INTERFACE_CLASS_HID,
-			     USB_INTERFACE_SUBCLASS_BOOT,
-			     USB_INTERFACE_PROTOCOL_KEYBOARD) },
-	{ }
+
+static int hello_probe(struct usb_interface *interface,
+	const struct usb_device_id *id)
+{
+	pr_info("HelloModule: USB keyboard probe function called\n\n");
+	return 0;
+}
+
+static void hello_disconnect(struct usb_interface *interface)
+{
+	pr_info("HelloModule: USB keyboard disconnect function called\n\n");
+}
+
+static const struct usb_device_id hello_id_table [] = {
+        { USB_INTERFACE_INFO(USB_INTERFACE_CLASS_HID,
+        		     USB_INTERFACE_SUBCLASS_BOOT,
+            		     USB_INTERFACE_PROTOCOL_KEYBOARD) },
+	{ } /* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE(usb, t1_id_table);
+MODULE_DEVICE_TABLE(usb, hello_id_table);
 
-static int __init t1_init(void)
+static struct usb_driver hello_driver = {
+	.name =		"hello_driver",
+	.probe = 	hello_probe,
+	.disconnect = 	hello_disconnect,
+	.id_table = 	hello_id_table
+};
+
+
+static int __init hello_init(void)
 {
-	pr_debug("Hello World!");
+	int retval = 0;
+
+	pr_info("HelloModule: Hello World!\n\n");
+	retval = usb_register(&hello_driver);
+	if (retval < 0) {
+		pr_err("HelloModule: usb_register failed. Error number %d\n", retval);
+		return -1;
+	}
 
 	return 0;
 }
 
-static void __exit t1_exit(void)
+static void __exit hello_exit(void)
 {
-	pr_debug("Good bye!");
+	pr_info("HelloModule: exit\n\n");
+	return usb_deregister(&hello_driver);
 }
 
-module_init(t1_init);
-module_exit(t1_exit);
+
+module_init(hello_init);
+module_exit(hello_exit);

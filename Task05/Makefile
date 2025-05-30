@@ -2,7 +2,7 @@ obj-m += main.o
 
 all:
 ifndef KERNEL_PATH
-	make -C /usr/lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	make -C /usr/lib/modules/$(shell uname -r)/build M=$(PWD) modules -j 8
 else
 	make -C ${KERNEL_PATH} M=$(PWD) modules
 endif

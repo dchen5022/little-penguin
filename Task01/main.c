@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Kamal Heib.  All rights reserved.
+ * Copyright (c) 2025 Dennis Chen.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -32,20 +32,20 @@
 
 #include <linux/module.h>
 
-MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
+MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
 MODULE_DESCRIPTION("little penguin Task1");
 MODULE_VERSION("0.1");
-MODULE_LICENSE("GPL v3");
+MODULE_LICENSE("GPL");
 
 static int __init t1_init(void)
 {
-	printk(KERN_DEBUG "Hello World!");
+	printk(KERN_DEBUG "Hello World!\n");
 	return 0;
 }
 
 static void __exit t1_exit(void)
 {
-	printk(KERN_DEBUG "Good bye!");
+	printk(KERN_DEBUG "Good bye!\n");
 }
 
 module_init(t1_init);

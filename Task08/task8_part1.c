@@ -30,11 +30,9 @@
  * SOFTWARE.
  */
 
-#include "linux/uaccess.h"
-#include <linux/debugfs.h>
-#include <linux/fs.h>
-#include <linux/jiffies.h>
 #include <linux/module.h>
+#include <linux/fs.h>
+#include <linux/debugfs.h>
 
 MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
 MODULE_DESCRIPTION("little penguin Task8");
@@ -43,21 +41,16 @@ MODULE_LICENSE("GPL");
 
 #define MODULE_NAME "eudyptula"
 #define ID "682c83e55b77"
-#define BUF_LEN 50
+#define BUF_LEN 30
 
-static char *foo_buf;
-static DECLARE_RWSEM(foo_rwlock);
-
-static ssize_t id_read(struct file *filp, char __user *ubuf, size_t count,
-		       loff_t *offp)
+static ssize_t t8_read(struct file *filp, char __user *ubuf, size_t count, loff_t *offp)
 {
 	char buf[BUF_LEN];
-	snprintf(buf, BUF_LEN, "%s\n", ID);
+	snprintf(buf, sizeof(buf), "%s\n", ID);
 	return simple_read_from_buffer(ubuf, count, offp, buf, BUF_LEN);
 }
 
-static ssize_t id_write(struct file *filp, const char __user *ubuf,
-			size_t count, loff_t *offp)
+static ssize_t t8_write(struct file *filp, const char __user *ubuf, size_t count, loff_t *offp)
 {
 	char buf[BUF_LEN];
 	int err = simple_write_to_buffer(buf, BUF_LEN, offp, ubuf, count);
@@ -66,70 +59,16 @@ static ssize_t id_write(struct file *filp, const char __user *ubuf,
 	if (strncmp(ID, buf, strlen(ID)) != 0 || strlen(ID) != strlen(buf))
 		return -EINVAL;
 	return count;
+
 }
 
-static const struct file_operations id_fops = { .read = id_read,
-						.write = id_write };
-
-static ssize_t jf_read(struct file *filp, char __user *ubuf, size_t count,
-		       loff_t *offp)
-{
-	unsigned long jiffies = get_jiffies_64();
-	char buf[BUF_LEN];
-	snprintf(buf, BUF_LEN, "%lu\n", jiffies);
-	return simple_read_from_buffer(ubuf, count, offp, buf, BUF_LEN);
-}
-
-static const struct file_operations jf_fops = { .read = jf_read };
-
-static ssize_t foo_read(struct file *filp, char __user *ubuf, size_t count,
-			loff_t *offp)
-{
-	if (*offp >= PAGE_SIZE)
-		return 0;
-
-	down_read(&foo_rwlock);
-	size_t len = (count > PAGE_SIZE) ? PAGE_SIZE : count;
-
-	ssize_t ncopied = copy_to_user(ubuf, foo_buf, len);
-
-	if (ncopied < 0)
-		return ncopied;
-
-	*offp += len;
-	up_read(&foo_rwlock);
-
-	return len;
-}
-
-static ssize_t foo_write(struct file *filp, const char __user *ubuf,
-			 size_t count, loff_t *offp)
-{
-	// err if user tries to read more than a page
-	if (*offp >= PAGE_SIZE)
-		return -ENOMEM;
-
-	down_write(&foo_rwlock);
-
-	size_t len = (count > PAGE_SIZE) ? PAGE_SIZE : count;
-	ssize_t ncopied = copy_from_user(foo_buf, ubuf, len);
-
-	if (ncopied < 0)
-		return ncopied;
-
-	*offp += len;
-
-	up_write(&foo_rwlock);
-	return len;
-}
-
-static const struct file_operations foo_fops = { .read = foo_read,
-						 .write = foo_write };
+static const struct file_operations t8_fops = {
+	.read = t8_read,
+	.write = t8_write
+};
 
 struct dentry *dir;
 struct dentry *id_file;
-struct dentry *jf_file;
-struct dentry *foo_file;
 
 static int __init t8_init(void)
 {
@@ -138,31 +77,13 @@ static int __init t8_init(void)
 	dir = debugfs_create_dir(MODULE_NAME, NULL);
 	if (IS_ERR_VALUE(dir)) {
 		pr_err("Task 8: Error creating debugfs directory\n");
-		return -ENODEV;
+		return -EFAULT;
 	}
 
-	id_file = debugfs_create_file("id", 0666, dir, NULL, &id_fops);
+	id_file = debugfs_create_file("id", 0666, dir, NULL, &t8_fops);
 	if (IS_ERR_VALUE(id_file)) {
 		pr_err("Task 8: Error creating debugfs id file\n");
-		return -ENODEV;
-	}
-
-	jf_file = debugfs_create_file("jiffies", 0444, dir, NULL, &jf_fops);
-	if (IS_ERR_VALUE(jf_file)) {
-		pr_err("Task 8: Error creating debugfs jiffies file\n");
-		return -ENODEV;
-	}
-
-	foo_buf = (char *)kzalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!foo_buf) {
-		return -ENOMEM;
-	}
-
-	foo_file = debugfs_create_file("foo", 0644, dir, NULL, &foo_fops);
-	if (IS_ERR_VALUE(foo_file)) {
-		pr_err("Task 8: Error creating debugfs jiffies file\n");
-		kfree(foo_buf);
-		return -ENODEV;
+		return -EFAULT;
 	}
 	return 0;
 }
@@ -170,7 +91,6 @@ static int __init t8_init(void)
 static void __exit t8_exit(void)
 {
 	printk(KERN_INFO "Task 8: Good bye!\n");
-	kfree(foo_buf);
 	debugfs_remove_recursive(dir);
 }
 

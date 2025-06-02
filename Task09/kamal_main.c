@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Dennis Chen.  All rights reserved.
+ * Copyright (c) 2016 Kamal Heib.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -29,109 +29,109 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include <linux/init.h>
+
+#include <linux/fs.h>
 #include <linux/jiffies.h>
 #include <linux/kobject.h>
 #include <linux/module.h>
-#include <linux/string.h>
-#include <linux/sysfs.h>
+#include <linux/uaccess.h>
 
-MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
-MODULE_DESCRIPTION("Little Penguin Task 9");
-MODULE_VERSION("0.1");
+MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
+MODULE_DESCRIPTION("little penguin Task09");
+MODULE_VERSION("9");
 MODULE_LICENSE("GPL");
 
-#define MODULE_NAME "eudyptula"
-#define ID "682c83e55b77"
+#define little_dbg(fmt, arg...) pr_dbg("little: " fmt, ##arg)
+#define little_err(fmt, arg...) pr_err("little: " fmt, ##arg)
+#define little_info(fmt, arg...) pr_info("little: " fmt, ##arg)
 
-static char foo_buf[PAGE_SIZE];
-static DECLARE_RWSEM(foo_rwlock);
+static int little_id = 0xff;
+
+static char little_foo_buf[PAGE_SIZE];
+static spinlock_t foo_lock;
 
 static ssize_t id_show(struct kobject *kobj, struct kobj_attribute *attr,
-		       char *buf)
-{
-	return sysfs_emit(buf, "%s\n", ID);
+                       char *buf) {
+  return sprintf(buf, "0x%x\n", little_id);
 }
 
 static ssize_t id_store(struct kobject *kobj, struct kobj_attribute *attr,
-			const char *buf, size_t count)
-{
-	if (strncmp(ID, buf, strlen(ID)) != 0 || strlen(ID) != strlen(buf))
-		return -EINVAL;
+                        const char *buf, size_t count) {
+  int ret, var;
 
-	return count;
+  ret = kstrtoint(buf, 16, &var);
+  if (ret < 0)
+    return ret;
+
+  little_id = var;
+
+  return count;
 }
+
+static struct kobj_attribute id_attribute = __ATTR_RW(id);
 
 static ssize_t jiffies_show(struct kobject *kobj, struct kobj_attribute *attr,
-			    char *buf)
-{
-	unsigned long jiffies = get_jiffies_64();
-	return sysfs_emit(buf, "%lu\n", jiffies);
+                            char *buf) {
+  return sprintf(buf, "%llu\n", get_jiffies_64());
 }
 
+static struct kobj_attribute jiffies_attribute = __ATTR_RO(jiffies);
+
 static ssize_t foo_show(struct kobject *kobj, struct kobj_attribute *attr,
-			char *buf)
-{
-	int retval;
+                        char *buf) {
+  spin_lock_irq(&foo_lock);
+  strncpy(buf, little_foo_buf, PAGE_SIZE - 1);
+  spin_unlock_irq(&foo_lock);
 
-	down_read(&foo_rwlock);
-	retval = sysfs_emit(buf, "%s\n", foo_buf);
-	up_read(&foo_rwlock);
-
-	return retval;
+  return PAGE_SIZE - 1;
 }
 
 static ssize_t foo_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t count)
-{
-	int retval;
+                         const char *buf, size_t count) {
+  if (count > PAGE_SIZE)
+    return -ENOSPC;
 
-	down_write(&foo_rwlock);
-	retval = snprintf(foo_buf, count, "%s\n", buf);
-	up_write(&foo_rwlock);
+  spin_lock_irq(&foo_lock);
+  strncpy(little_foo_buf, buf, PAGE_SIZE - 1);
+  spin_unlock_irq(&foo_lock);
 
-	return retval;
+  return count;
 }
 
-static struct kobj_attribute id_attr = __ATTR(id, 0644, id_show, id_store);
-static struct kobj_attribute jiffies_attr = __ATTR_RO(jiffies);
-static struct kobj_attribute foo_attr = __ATTR(foo, 0644, foo_show, foo_store);
+static struct kobj_attribute foo_attribute = __ATTR_RW(foo);
 
 static struct attribute *attrs[] = {
-	&id_attr.attr, &jiffies_attr.attr, &foo_attr.attr,
-	NULL /* Need to terminate list with NULL */
+    &id_attribute.attr, &jiffies_attribute.attr,
+    /* &foo_attribute.attr, */
+    NULL, /* need to NULL terminate the list of attributes */
 };
 
 static struct attribute_group attr_group = {
-	.attrs = attrs,
+    .attrs = attrs,
 };
 
-struct kobject *root;
+static struct kobject *root;
 
-static int __init t9_init(void)
-{
-	int retval;
-	printk(KERN_INFO "Task 9: Hello World!\n");
+static int __init t9_init(void) {
+  int err;
 
-	root = kobject_create_and_add("eudyptula", NULL);
-	if (!root) {
-		printk(KERN_ERR
-		       "Task 9: Could not create eudyptula directory\n");
-		return -ENOMEM;
-	}
-	retval = sysfs_create_group(root, &attr_group);
-	if (retval) {
-		printk(KERN_ERR "Task 9: Could not create attributes\n");
-		kobject_put(root);
-	}
+  little_info("Hello sysfs world\n");
 
-	return retval;
+  root = kobject_create_and_add("eudyptula", kernel_kobj);
+  if (!root)
+    return -ENOMEM;
+
+  err = sysfs_create_group(root, &attr_group);
+  if (err)
+    kobject_put(root);
+
+  return err;
 }
 
-static void __exit t9_exit(void)
-{
-	printk(KERN_INFO "Task 9: Goodbye!\n");
-	kobject_put(root);
+static void __exit t9_exit(void) {
+  little_info("Good bye sysfs!\n");
+
+  kobject_put(root);
 }
 
 module_init(t9_init);

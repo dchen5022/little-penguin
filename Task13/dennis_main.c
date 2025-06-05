@@ -35,7 +35,7 @@
 #include <linux/slab.h>
 
 MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
-MODULE_DESCRIPTION("Little Penguin Task 13");
+MODULE_DESCRIPTION("Little Penguin Task 12");
 MODULE_VERSION("0.1");
 MODULE_LICENSE("GPL");
 
@@ -90,9 +90,9 @@ static void identity_destroy(int id)
 	}
 }
 
-static int __init t13_init(void)
+static int __init t1_init(void)
 {
-	printk(KERN_DEBUG "Task 13: Hello World!\n");
+	printk(KERN_DEBUG "Task 12: Hello World!\n");
 	cache = kmem_cache_create("eudyptula", sizeof(struct identity), 0,
 				  SLAB_POISON, NULL);
 
@@ -104,11 +104,11 @@ static int __init t13_init(void)
 	identity_create("Gena", 10);
 
 	temp = identity_find(3);
-	printk(KERN_DEBUG "Task 13: id 3 = %s\n", temp->name);
+	printk(KERN_DEBUG "Task 12: id 3 = %s\n", temp->name);
 
 	temp = identity_find(42);
 	if (temp == NULL)
-		pr_debug("Task 13: id 42 not found\n");
+		pr_debug("Task 12: id 42 not found\n");
 
 	identity_destroy(2);
 	identity_destroy(1);
@@ -119,7 +119,7 @@ static int __init t13_init(void)
 	return 0;
 }
 
-static void __exit t13_exit(void)
+static void __exit t1_exit(void)
 {
 	struct identity *iter, *next;
 	list_for_each_entry_safe(iter, next, &id_list, list) {
@@ -127,8 +127,8 @@ static void __exit t13_exit(void)
 		kmem_cache_free(cache, iter);
 	}
 	kmem_cache_destroy(cache);
-	printk(KERN_DEBUG "Task 13: Good bye!\n");
+	printk(KERN_DEBUG "Task 12: Good bye!\n");
 }
 
-module_init(t13_init);
-module_exit(t13_exit);
+module_init(t1_init);
+module_exit(t1_exit);

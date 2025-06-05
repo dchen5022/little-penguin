@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025 Dennis Chen.  All rights reserved.
+ * Copyright (c) 2016 Kamal Heib.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -30,85 +30,112 @@
  * SOFTWARE.
  */
 
+#include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/module.h>
-#include <linux/slab.h>
 
-MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
-MODULE_DESCRIPTION("Little Penguin Task 13");
-MODULE_VERSION("0.1");
-MODULE_LICENSE("GPL");
-
-#define NAME_LEN 20
+MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
+MODULE_DESCRIPTION("little penguin Task12");
+MODULE_VERSION("12");
+MODULE_LICENSE("GPL v2");
 
 struct identity {
-	char name[NAME_LEN];
+	char name[20];
 	int id;
 	bool busy;
 	struct list_head list;
 };
 
-static LIST_HEAD(id_list);
-static struct kmem_cache *cache;
+static LIST_HEAD(identities);
+static struct kmem_cache *t12_cache;
 
 static int identity_create(char *name, int id)
 {
 	struct identity *new;
 
-	new = kmem_cache_alloc(cache, GFP_KERNEL);
-	if (!new) {
+	new = kmem_cache_alloc(t12_cache, GFP_KERNEL);
+	if (!new)
 		return -ENOMEM;
-	}
 
-	snprintf(new->name, NAME_LEN, "%s", name);
+	strcpy(new->name, name);
 	new->id = id;
-	new->busy = false;
-	INIT_LIST_HEAD(&new->list);
 
-	list_add(&new->list, &id_list);
+	list_add_tail(&new->list, &identities);
 	return 0;
 }
 
-static struct identity *identity_find(int id)
+struct identity *identity_find(int id)
 {
-	struct identity *iter;
-	list_for_each_entry(iter, &id_list, list) {
-		if (iter->id == id)
-			return iter;
+	struct identity *i;
+
+	list_for_each_entry(i, &identities, list) {
+		if (i->id == id)
+			return i;
 	}
+
 	return NULL;
 }
 
-static void identity_destroy(int id)
+void identity_destroy(int id)
 {
-	struct identity *iter, *next;
-	list_for_each_entry_safe(iter, next, &id_list, list) {
-		if (iter->id == id) {
-			list_del(&iter->list);
-			kmem_cache_free(cache, iter);
+	struct identity *i, *tmp;
+
+	list_for_each_entry_safe_reverse(i, tmp, &identities, list) {
+		if (i->id == id) {
+			list_del(&i->list);
+			kmem_cache_free(t12_cache, i);
+			return;
 		}
+	}
+
+	pr_err("Can not destroy id=%d, id not found!\n", id);
+}
+
+void identity_destroy_all(void)
+{
+	struct identity *i, *tmp;
+
+	list_for_each_entry_safe(i, tmp, &identities, list) {
+		list_del(&i->list);
+		kmem_cache_free(t12_cache, i);
 	}
 }
 
-static int __init t13_init(void)
+static int __init t12_init(void)
 {
-	printk(KERN_DEBUG "Task 13: Hello World!\n");
-	cache = kmem_cache_create("eudyptula", sizeof(struct identity), 0,
-				  SLAB_POISON, NULL);
-
 	struct identity *temp;
+	int err;
 
-	identity_create("Alice", 1);
-	identity_create("Bob", 2);
-	identity_create("Dave", 3);
-	identity_create("Gena", 10);
+	pr_info("Hello World\n");
+	t12_cache = kmem_cache_create("eudyptula",
+				      sizeof(struct identity),
+				      0, SLAB_POISON,
+				      NULL);
+	if (!t12_cache)
+		return -ENOMEM;
+
+	err = identity_create("Alice", 1);
+	if (err)
+		goto destroy;
+
+	err = identity_create("Bob", 2);
+	if (err)
+		goto destroy;
+
+	err = identity_create("Dave", 3);
+	if (err)
+		goto destroy;
+
+	err = identity_create("Gena", 10);
+	if (err)
+		goto destroy;
 
 	temp = identity_find(3);
-	printk(KERN_DEBUG "Task 13: id 3 = %s\n", temp->name);
+	pr_debug("id 3 = %s\n", temp->name);
 
 	temp = identity_find(42);
 	if (temp == NULL)
-		pr_debug("Task 13: id 42 not found\n");
+		pr_debug("id 42 not found\n");
 
 	identity_destroy(2);
 	identity_destroy(1);
@@ -117,18 +144,18 @@ static int __init t13_init(void)
 	identity_destroy(3);
 
 	return 0;
+
+destroy:
+	identity_destroy_all();
+	return err;
 }
 
-static void __exit t13_exit(void)
+static void __exit t12_exit(void)
 {
-	struct identity *iter, *next;
-	list_for_each_entry_safe(iter, next, &id_list, list) {
-		list_del(&iter->list);
-		kmem_cache_free(cache, iter);
-	}
-	kmem_cache_destroy(cache);
-	printk(KERN_DEBUG "Task 13: Good bye!\n");
+	pr_info("Good bye\n");
+	identity_destroy_all();
+	kmem_cache_destroy(t12_cache);
 }
 
-module_init(t13_init);
-module_exit(t13_exit);
+module_init(t12_init);
+module_exit(t12_exit);

@@ -92,16 +92,36 @@ static void identity_destroy(int id)
 	}
 }
 
+static void identity_destroy_all(void) {
+	struct identity *iter, *next;
+	list_for_each_entry_safe(iter, next, &id_list, list) {
+		list_del(&iter->list);
+		kfree(iter);
+	}
+}
+
 static int __init t1_init(void)
 {
 	printk(KERN_DEBUG "Task 12: Hello World!\n");
 
 	struct identity *temp;
+	int err;
 
-	identity_create("Alice", 1);
-	identity_create("Bob", 2);
-	identity_create("Dave", 3);
-	identity_create("Gena", 10);
+	err = identity_create("Alice", 1);
+	if (err)
+		goto error;
+
+	err = identity_create("Bob", 2);
+	if (err)
+		goto error;
+
+	err =identity_create("Dave", 3);
+	if (err)
+		goto error;
+
+	err =identity_create("Gena", 10);
+	if (err)
+		goto error;
 
 	temp = identity_find(3);
 	printk(KERN_DEBUG "Task 12: id 3 = %s\n", temp->name);
@@ -116,16 +136,14 @@ static int __init t1_init(void)
 	identity_destroy(42);
 	identity_destroy(3);
 
+error: 
+	identity_destroy_all();
 	return 0;
 }
 
 static void __exit t1_exit(void)
 {
-	struct identity *iter, *next;
-	list_for_each_entry_safe(iter, next, &id_list, list) {
-		list_del(&iter->list);
-		kfree(iter);
-	}
+	identity_destroy_all();
 	printk(KERN_DEBUG "Task 12: Good bye!\n");
 }
 

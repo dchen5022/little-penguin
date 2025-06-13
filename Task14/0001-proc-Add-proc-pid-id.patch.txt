@@ -1,0 +1,68 @@
+From bf89a54852103c475bbc8826d9f3bbdea5547251 Mon Sep 17 00:00:00 2001
+From: Dennis Chen <dechen@redhat.com>
+Date: Wed, 11 Jun 2025 10:07:38 -0400
+Subject: [PATCH] proc: Add /proc/{pid}/id
+
+Eudyptula Challenge Task 14: Create id entry in /proc/{pid}/
+
+Signed-off-by: Dennis Chen <dechen@redhat.com>
+---
+ fs/proc/base.c        | 8 ++++++++
+ include/linux/sched.h | 2 +-
+ kernel/fork.c         | 1 +
+ 3 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/fs/proc/base.c b/fs/proc/base.c
+index c667702dc69b..4369f877c22c 100644
+--- a/fs/proc/base.c
++++ b/fs/proc/base.c
+@@ -3239,6 +3239,13 @@ static int proc_pid_personality(struct seq_file *m, struct pid_namespace *ns,
+ 	return err;
+ }
+ 
++static int proc_pid_id(struct seq_file *m, struct pid_namespace *ns,
++				struct pid *pid, struct task_struct *task)
++{
++	seq_printf(m, "0x%llx\n", task->id);
++	return 0;
++}
++
+ #ifdef CONFIG_LIVEPATCH
+ static int proc_pid_patch_state(struct seq_file *m, struct pid_namespace *ns,
+ 				struct pid *pid, struct task_struct *task)
+@@ -3325,6 +3332,7 @@ static const struct pid_entry tgid_base_stuff[] = {
+ 	REG("auxv",       S_IRUSR, proc_auxv_operations),
+ 	ONE("status",     S_IRUGO, proc_pid_status),
+ 	ONE("personality", S_IRUSR, proc_pid_personality),
++	ONE("id", S_IRUGO, proc_pid_id),
+ 	ONE("limits",	  S_IRUGO, proc_pid_limits),
+ 	REG("sched",      S_IRUGO|S_IWUSR, proc_pid_sched_operations),
+ #ifdef CONFIG_SCHED_AUTOGROUP
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 4f78a64beb52..a6b13f3716af 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -860,7 +860,7 @@ struct task_struct {
+ 	int				wake_cpu;
+ #endif
+ 	int				on_rq;
+-
++	u64				id;
+ 	int				prio;
+ 	int				static_prio;
+ 	int				normal_prio;
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 1ee8eb11f38b..751d26b95126 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -2062,6 +2062,7 @@ __latent_entropy struct task_struct *copy_process(
+ 
+ 	init_sigpending(&p->pending);
+ 
++	p->id = 0x682c83e55b77;
+ 	p->utime = p->stime = p->gtime = 0;
+ #ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
+ 	p->utimescaled = p->stimescaled = 0;
+-- 
+2.49.0
+

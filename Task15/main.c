@@ -1,23 +1,25 @@
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
-int main(int argc, char *argv[])
-{
-	int id_h = 0x682c;
-        int id_l = 0x83e55b77;
-        long error;
+#define SYS_EUDYPTULA 463
 
-        error = syscall(333, id_h, id_l);
-        if (error) {
-                printf("syscall error=%d\n", error);
-                return 1;
-        }
+int main() {
+    int high_id = 0x682c;
+    int low_id = 0x83e55b77;
+    long res;
 
-        id_l += 1;
-        error = syscall(333, id_h, id_l);
-        if (error) {
-                printf("syscall error=%d\n", error);
-                return 1;
-        }
+    /* Valid call to sys_eudyptula */
+    res = syscall(SYS_EUDYPTULA, high_id, low_id);
+    if (res)
+        goto err;
 
-	return 0;
+    /* Invalid call to sys_eudyptula */
+    res = syscall(SYS_EUDYPTULA, low_id, high_id);
+    if (res)
+        goto err;
+
+err:
+    fprintf(stderr, "sys_eudyptula failed with err=%ld\n", res);
+    return 1;
 }

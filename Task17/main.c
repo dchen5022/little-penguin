@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Kamal Heib.  All rights reserved.
+ * Copyright (c) 2025 Dennis Chen.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -31,90 +31,89 @@
  */
 
 #include <linux/fs.h>
-#include <linux/wait.h>
-#include <linux/module.h>
-#include <linux/kthread.h>
 #include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <linux/wait.h>
+#include <linux/kthread.h>
 
-MODULE_AUTHOR("Kamal Heib <kamalheib1@gmail.com>");
-MODULE_DESCRIPTION("Little Penguin Task17");
+MODULE_AUTHOR("Dennis Chen <dechen@redhat.com>");
+MODULE_DESCRIPTION("Little Penguin Challenge Task 17");
 MODULE_VERSION("0.1");
-MODULE_LICENSE("GPL v3");
+MODULE_LICENSE("GPL");
 
-#define TIME_OUT	msecs_to_jiffies(10000)
+uint8_t *id = "682c83e55b77";
+#define ID_LEN 12
+#define BUF_LEN 50
 
-static wait_queue_head_t wee_wait;
-static struct task_struct *thread;
+static struct task_struct *eudyptula;
+DECLARE_WAIT_QUEUE_HEAD(wee_wait);
 
-int thread_handler(void *data)
+static ssize_t t17_misc_write(struct file *filp, const char __user *buff,
+			      size_t count, loff_t *offp)
+{
+	pr_info("t17_misc_dev: write called");
+	uint8_t databuf[BUF_LEN];
+
+	if (copy_from_user(databuf, buff, BUF_LEN)) {
+		return -EFAULT;
+	}
+
+	/* end string to prevent looking at uninit memory */
+	databuf[count] = '\0';
+
+	pr_info("t17_misc_dev: count : %lu\n", count);
+	pr_info("t17_misc_dev: input len: %lu\n", strlen(databuf));
+	pr_info("t17_misc_dev: input : %s\n", databuf);
+	if (strncmp(databuf, id, ID_LEN) != 0 || strlen(databuf) != ID_LEN) {
+		return -EINVAL;
+	}
+	return count;
+}
+
+static const struct file_operations t17_misc_fops = { .owner = THIS_MODULE,
+						      .write = t17_misc_write };
+
+struct miscdevice t17_misc = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "eudyptula",
+	.mode = S_IWUGO,
+	.fops = &t17_misc_fops,
+};
+
+static int wait_function(void *_)
 {
 	while(!kthread_should_stop()) {
-		wait_event_interruptible_timeout(wee_wait, 0, TIME_OUT);
+		wait_event_interruptible(wee_wait, 0);
 	}
 
 	return 0;
 }
 
-static ssize_t t17_write(struct file *file,
-			const char __user *ubuf,
-			size_t count,
-			loff_t *ppos)
-{
-	int num;
-	int err;
-	char buf[80];
-
-	err = simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, ubuf, count);
-	if (err < 0)
-		return err;
-
-	sscanf(buf, "%x\n", &num);
-
-	return num == MISC_DYNAMIC_MINOR ? count : -EINVAL;
-
-}
-
-static const struct file_operations t17_chardev_ops = {
-	.write	= t17_write,
-};
-
-static struct miscdevice t17_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "eudyptula",
-	.mode = S_IWUGO | S_IRUGO,
-	.fops = &t17_chardev_ops,
-};
-
 static int __init t17_init(void)
 {
-	int err;
+	int error;
 
-	init_waitqueue_head(&wee_wait);
-
-	thread = kthread_create(thread_handler, NULL, "eudyptula");
-	if (IS_ERR(thread)) {
-		pr_err("Task17: Failed to create eudyptula thread!\n");
-		return 1;
+	eudyptula = kthread_create(wait_function, NULL, "eudyptula");
+	if (!eudyptula) {
+		pr_err("t17_misc_dev: failed to create kernel thread\n");
 	}
 
-	err = misc_register(&t17_dev);
-	if (err) {
-		pr_err("Task17: Failed to register misc device err(%d)\n",
-		       err);
-		kthread_stop(thread);
-		return 1;
+	error = misc_register(&t17_misc);
+	if (error) {
+		pr_err("t17_misc_dev: misc_register failed with code: %d\n",
+		       error);
+		return error;
 	}
 
-	wake_up_process(thread);
-
+	printk(KERN_DEBUG "t17_misc_dev: t17_misc_dev registered!\n");
 	return 0;
 }
 
 static void __exit t17_exit(void)
 {
-	if (thread)
-		kthread_stop(thread);
-	misc_deregister(&t17_dev);
+	misc_deregister(&t17_misc);
+	kthread_stop(eudyptula);
+	printk(KERN_DEBUG "t17_misc_dev: t17_misc_dev deregistered!\n");
 }
 
 module_init(t17_init);

@@ -114,3 +114,7 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+# eudyptula challenge
+*.mod
+*.json

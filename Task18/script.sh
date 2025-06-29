@@ -1,7 +1,6 @@
-insmod main.ko
-echo "Alice" > /dev/eudyptula
-echo "Bob" > /dev/eudyptula
+echo -n "Alice" > /dev/eudyptula
+echo -n "Bob" > /dev/eudyptula
 sleep 15
-echo "Dave" > /dev/eudyptula
-echo "Gena" > /dev/eudyptula
+echo -n "Dave" > /dev/eudyptula
+echo -n "Gena" > /dev/eudyptula
 rmmod main
